@@ -1,0 +1,147 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model attribute_values {
+  id                 Int                  @id(map: "PK__attribut__3213E83F0781153C") @default(autoincrement())
+  attribute_id       Int?
+  value              String?              @db.NVarChar(255)
+  attributes         attributes?          @relation(fields: [attribute_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__attribute__attri__76969D2E")
+  product_attributes product_attributes[]
+}
+
+model attributes {
+  id               Int                @id(map: "PK__attribut__3213E83FAD1BA4FE") @default(autoincrement())
+  name             String             @db.NVarChar(255)
+  attribute_values attribute_values[]
+}
+
+model brands {
+  id         Int        @id(map: "PK__brands__3213E83FFB6F0A60") @default(autoincrement())
+  name       String     @db.NVarChar(255)
+  logo       String?    @db.NVarChar(255)
+  country    String?    @db.NVarChar(100)
+  created_at DateTime?  @default(now(), map: "DF__brands__created___619B8048") @db.DateTime
+  products   products[]
+}
+
+model categories {
+  id               Int          @id(map: "PK__categori__3213E83F1A9634C9") @default(autoincrement())
+  name             String       @db.NVarChar(255)
+  parent_id        Int?
+  slug             String?      @unique(map: "UQ__categori__32DD1E4C20F76F4A") @db.NVarChar(255)
+  created_at       DateTime?    @default(now(), map: "DF__categorie__creat__5DCAEF64") @db.DateTime
+  categories       categories?  @relation("categoriesTocategories", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK__categorie__paren__5EBF139D")
+  other_categories categories[] @relation("categoriesTocategories")
+  products         products[]
+}
+
+model product_attributes {
+  product_id         Int
+  attribute_value_id Int
+  attribute_values   attribute_values @relation(fields: [attribute_value_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_a__attri__7A672E12")
+  products           products         @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_a__produ__797309D9")
+
+  @@id([product_id, attribute_value_id], map: "PK__product___3B8307DA87B644F7")
+}
+
+model product_images {
+  id         Int       @id(map: "PK__product___3213E83FDA6FA507") @default(autoincrement())
+  product_id Int?
+  image_url  String?   @db.NVarChar(255)
+  is_main    Boolean?  @default(false, map: "DF__product_i__is_ma__70DDC3D8")
+  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_i__produ__71D1E811")
+}
+
+model product_reviews {
+  id         Int       @id(map: "PK__product___3213E83F090CE382") @default(autoincrement())
+  product_id Int?
+  rating     Int?
+  comment    String?   @db.NVarChar(Max)
+  created_at DateTime? @default(now(), map: "DF__product_r__creat__7D439ABD") @db.DateTime
+  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_r__produ__7E37BEF6")
+}
+
+model product_variants {
+  id         Int       @id(map: "PK__product___3213E83F864FCB7A") @default(autoincrement())
+  product_id Int
+  sku        String?   @unique(map: "UQ__product___DDDF4BE76EE5DFCE") @db.NVarChar(100)
+  name       String?   @db.NVarChar(255)
+  price      Decimal   @db.Decimal(12, 2)
+  stock      Int?      @default(0, map: "DF__product_v__stock__6C190EBB")
+  created_at DateTime? @default(now(), map: "DF__product_v__creat__6D0D32F4") @db.DateTime
+  products   products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_v__produ__6E01572D")
+
+  @@index([price], map: "idx_variant_price")
+}
+
+model products {
+  id                 Int                  @id(map: "PK__products__3213E83F370390A2") @default(autoincrement())
+  name               String               @db.NVarChar(255)
+  slug               String?              @unique(map: "UQ__products__32DD1E4C5CD6A171") @db.NVarChar(255)
+  description        String?              @db.NVarChar(Max)
+  brand_id           Int?
+  category_id        Int?
+  status             String?              @default("active", map: "DF__products__status__656C112C") @db.NVarChar(20)
+  created_at         DateTime?            @default(now(), map: "DF__products__create__66603565") @db.DateTime
+  product_attributes product_attributes[]
+  product_images     product_images[]
+  product_reviews    product_reviews[]
+  product_variants   product_variants[]
+  brands             brands?              @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK__products__brand___6754599E")
+  categories         categories?          @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK__products__catego__68487DD7")
+  cart_items         cart_items[]
+  order_items        order_items[]
+
+  @@index([name], map: "idx_product_name")
+}
+
+model users {
+  id         Int          @id @default(autoincrement())
+  email      String       @unique @db.NVarChar(255)
+  password   String       @db.NVarChar(255)
+  role       String       @default("USER") @db.NVarChar(50)
+  name       String?      @db.NVarChar(255)
+  phone      String?      @db.NVarChar(20)
+  address    String?      @db.NVarChar(500)
+  created_at DateTime?    @default(now()) @db.DateTime
+  cart_items cart_items[]
+  orders     orders[]
+}
+
+model cart_items {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  product_id Int
+  quantity   Int       @default(1)
+  created_at DateTime? @default(now()) @db.DateTime
+  products   products  @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, product_id])
+}
+
+model orders {
+  id           Int           @id @default(autoincrement())
+  user_id      Int
+  total_amount Float
+  status       String        @default("PENDING") @db.NVarChar(50)
+  created_at   DateTime?     @default(now()) @db.DateTime
+  order_items  order_items[]
+  users        users         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+model order_items {
+  id         Int      @id @default(autoincrement())
+  order_id   Int
+  product_id Int
+  quantity   Int
+  price      Float
+  orders     orders   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  products   products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+}
