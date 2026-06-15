@@ -1,4 +1,5 @@
 const prisma = require('../utils/prisma');
+const bcrypt = require('bcryptjs');
 
 // @desc    Create new order from cart
 // @route   POST /api/orders/checkout
@@ -317,6 +318,129 @@ const updateOrderStatus = async (req, res) => {
   }
 };
 
+// @desc    Create new order for guest (no login required)
+// @route   POST /api/orders/guest-checkout
+// @access  Public
+const createGuestOrder = async (req, res) => {
+  try {
+    const { name, phone, email, address, items } = req.body;
+
+    if (!name || !phone || !email || !address || !items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Vui lòng cung cấp đầy đủ thông tin khách hàng và danh sách sản phẩm.' });
+    }
+
+    const order = await prisma.$transaction(async (tx) => {
+      // 1. Check if user exists
+      let userId;
+      const userExists = await tx.users.findUnique({
+        where: { email }
+      });
+
+      if (userExists) {
+        userId = userExists.id;
+        // Update name, phone, address with the latest customer input
+        await tx.users.update({
+          where: { id: userId },
+          data: {
+            name: name,
+            phone: phone,
+            address: address
+          }
+        });
+      } else {
+        // Create a new guest user
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(`guest_${Date.now()}`, salt);
+        const newUser = await tx.users.create({
+          data: {
+            email,
+            password: hashedPassword,
+            name,
+            phone,
+            address,
+            role: 'USER'
+          }
+        });
+        userId = newUser.id;
+      }
+
+      let totalAmount = 0;
+      const orderItemsData = [];
+
+      // 2. Check stock and prepare order items
+      for (const item of items) {
+        const product = await tx.products.findUnique({
+          where: { id: parseInt(item.product_id) },
+          include: { product_variants: true }
+        });
+
+        if (!product) {
+          throw new Error(`Sản phẩm với ID ${item.product_id} không tồn tại.`);
+        }
+
+        const firstVariant = product.product_variants && product.product_variants.length > 0
+          ? product.product_variants[0]
+          : null;
+
+        if (!firstVariant) {
+          throw new Error(`Sản phẩm ${product.name} không có biến thể hợp lệ.`);
+        }
+
+        const variantCheck = await tx.product_variants.findUnique({
+          where: { id: firstVariant.id }
+        });
+
+        if ((variantCheck.stock || 0) < item.quantity) {
+          throw new Error(`Sản phẩm ${product.name} chỉ còn ${variantCheck.stock} sản phẩm trong kho, không đủ số lượng bạn yêu cầu.`);
+        }
+
+        const price = parseFloat(variantCheck.price);
+        const quantity = item.quantity;
+        totalAmount += price * quantity;
+
+        orderItemsData.push({
+          product_id: parseInt(item.product_id),
+          quantity: quantity,
+          price: price,
+        });
+
+        // Deduct stock
+        await tx.product_variants.update({
+          where: { id: firstVariant.id },
+          data: {
+            stock: {
+              decrement: item.quantity
+            }
+          }
+        });
+      }
+
+      // 3. Create order
+      const newOrder = await tx.orders.create({
+        data: {
+          user_id: userId,
+          total_amount: totalAmount,
+          status: 'PENDING',
+          order_items: {
+            create: orderItemsData,
+          },
+        },
+        include: { order_items: true },
+      });
+
+      return newOrder;
+    });
+
+    res.status(201).json(order);
+  } catch (error) {
+    console.error('Create guest order error:', error);
+    if (error.message.includes('không đủ số lượng') || error.message.includes('không tồn tại') || error.message.includes('không có biến thể')) {
+      return res.status(400).json({ message: error.message });
+    }
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   createOrder,
   getMyOrders,
@@ -324,4 +448,5 @@ module.exports = {
   cancelOrder,
   getAllOrders,
   updateOrderStatus,
+  createGuestOrder,
 };
