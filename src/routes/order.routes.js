@@ -5,9 +5,16 @@ const {
   getMyOrders,
   getOrderById,
   cancelOrder,
+  getAllOrders,
+  updateOrderStatus,
 } = require('../controllers/order.controller');
-const { protect } = require('../middlewares/auth.middleware');
+const { protect, admin } = require('../middlewares/auth.middleware');
 
+// Admin routes
+router.get('/', protect, admin, getAllOrders);
+router.put('/:id/status', protect, admin, updateOrderStatus);
+
+// User routes
 router.post('/checkout', protect, createOrder);
 router.get('/my-orders', protect, getMyOrders);
 router.get('/:id', protect, getOrderById);

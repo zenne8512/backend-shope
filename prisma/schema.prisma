@@ -8,140 +8,162 @@ datasource db {
 }
 
 model attribute_values {
-  id                 Int                  @id(map: "PK__attribut__3213E83F0781153C") @default(autoincrement())
-  attribute_id       Int?
-  value              String?              @db.NVarChar(255)
-  attributes         attributes?          @relation(fields: [attribute_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__attribute__attri__76969D2E")
+  id                 Int                  @id @default(autoincrement())
+  attribute_id       Int?                 @map("thuoc_tinh_id")
+  value              String?              @db.NVarChar(255) @map("gia_tri")
+  attributes         attributes?          @relation(fields: [attribute_id], references: [id], onDelete: Cascade)
   product_attributes product_attributes[]
+
+  @@map("gia_tri_thuoc_tinh")
 }
 
 model attributes {
-  id               Int                @id(map: "PK__attribut__3213E83FAD1BA4FE") @default(autoincrement())
-  name             String             @db.NVarChar(255)
+  id               Int                @id @default(autoincrement())
+  name             String             @db.NVarChar(255) @map("ten")
   attribute_values attribute_values[]
+
+  @@map("thuoc_tinh")
 }
 
 model brands {
-  id         Int        @id(map: "PK__brands__3213E83FFB6F0A60") @default(autoincrement())
-  name       String     @db.NVarChar(255)
+  id         Int        @id @default(autoincrement())
+  name       String     @db.NVarChar(255) @map("ten")
   logo       String?    @db.NVarChar(255)
-  country    String?    @db.NVarChar(100)
-  created_at DateTime?  @default(now(), map: "DF__brands__created___619B8048") @db.DateTime
+  country    String?    @db.NVarChar(100) @map("quoc_gia")
+  created_at DateTime?  @default(now()) @db.DateTime @map("ngay_tao")
   products   products[]
+
+  @@map("thuong_hieu")
 }
 
 model categories {
-  id               Int          @id(map: "PK__categori__3213E83F1A9634C9") @default(autoincrement())
-  name             String       @db.NVarChar(255)
-  parent_id        Int?
-  slug             String?      @unique(map: "UQ__categori__32DD1E4C20F76F4A") @db.NVarChar(255)
-  created_at       DateTime?    @default(now(), map: "DF__categorie__creat__5DCAEF64") @db.DateTime
-  categories       categories?  @relation("categoriesTocategories", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK__categorie__paren__5EBF139D")
+  id               Int          @id @default(autoincrement())
+  name             String       @db.NVarChar(255) @map("ten")
+  parent_id        Int?         @map("danh_muc_cha_id")
+  slug             String?      @unique @db.NVarChar(255)
+  created_at       DateTime?    @default(now()) @db.DateTime @map("ngay_tao")
+  categories       categories?  @relation("categoriesTocategories", fields: [parent_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_categories categories[] @relation("categoriesTocategories")
   products         products[]
+
+  @@map("danh_muc")
 }
 
 model product_attributes {
-  product_id         Int
-  attribute_value_id Int
-  attribute_values   attribute_values @relation(fields: [attribute_value_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_a__attri__7A672E12")
-  products           products         @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_a__produ__797309D9")
+  product_id         Int              @map("san_pham_id")
+  attribute_value_id Int              @map("gia_tri_thuoc_tinh_id")
+  attribute_values   attribute_values @relation(fields: [attribute_value_id], references: [id], onDelete: Cascade)
+  products           products         @relation(fields: [product_id], references: [id], onDelete: Cascade)
 
-  @@id([product_id, attribute_value_id], map: "PK__product___3B8307DA87B644F7")
+  @@id([product_id, attribute_value_id])
+  @@map("thuoc_tinh_san_pham")
 }
 
 model product_images {
-  id         Int       @id(map: "PK__product___3213E83FDA6FA507") @default(autoincrement())
-  product_id Int?
-  image_url  String?   @db.NVarChar(255)
-  is_main    Boolean?  @default(false, map: "DF__product_i__is_ma__70DDC3D8")
-  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_i__produ__71D1E811")
+  id         Int       @id @default(autoincrement())
+  product_id Int?      @map("san_pham_id")
+  image_url  String?   @db.NVarChar(255) @map("url_anh")
+  is_main    Boolean?  @default(false) @map("anh_chinh")
+  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("hinh_anh_san_pham")
 }
 
 model product_reviews {
-  id         Int       @id(map: "PK__product___3213E83F090CE382") @default(autoincrement())
-  product_id Int?
-  rating     Int?
-  comment    String?   @db.NVarChar(Max)
-  created_at DateTime? @default(now(), map: "DF__product_r__creat__7D439ABD") @db.DateTime
-  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_r__produ__7E37BEF6")
+  id         Int       @id @default(autoincrement())
+  product_id Int?      @map("san_pham_id")
+  rating     Int?      @map("diem_danh_gia")
+  comment    String?   @db.NVarChar(Max) @map("binh_luan")
+  created_at DateTime? @default(now()) @db.DateTime @map("ngay_tao")
+  products   products? @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("danh_gia_san_pham")
 }
 
 model product_variants {
-  id         Int       @id(map: "PK__product___3213E83F864FCB7A") @default(autoincrement())
-  product_id Int
-  sku        String?   @unique(map: "UQ__product___DDDF4BE76EE5DFCE") @db.NVarChar(100)
-  name       String?   @db.NVarChar(255)
-  price      Decimal   @db.Decimal(12, 2)
-  stock      Int?      @default(0, map: "DF__product_v__stock__6C190EBB")
-  created_at DateTime? @default(now(), map: "DF__product_v__creat__6D0D32F4") @db.DateTime
-  products   products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "FK__product_v__produ__6E01572D")
+  id         Int       @id @default(autoincrement())
+  product_id Int       @map("san_pham_id")
+  sku        String?   @unique @db.NVarChar(100)
+  name       String?   @db.NVarChar(255) @map("ten")
+  price      Decimal   @db.Decimal(12, 2) @map("gia")
+  stock      Int?      @default(0) @map("ton_kho")
+  created_at DateTime? @default(now()) @db.DateTime @map("ngay_tao")
+  products   products  @relation(fields: [product_id], references: [id], onDelete: Cascade)
 
   @@index([price], map: "idx_variant_price")
+  @@map("bien_the_san_pham")
 }
 
 model products {
-  id                 Int                  @id(map: "PK__products__3213E83F370390A2") @default(autoincrement())
-  name               String               @db.NVarChar(255)
-  slug               String?              @unique(map: "UQ__products__32DD1E4C5CD6A171") @db.NVarChar(255)
-  description        String?              @db.NVarChar(Max)
-  brand_id           Int?
-  category_id        Int?
-  status             String?              @default("active", map: "DF__products__status__656C112C") @db.NVarChar(20)
-  created_at         DateTime?            @default(now(), map: "DF__products__create__66603565") @db.DateTime
+  id                 Int                  @id @default(autoincrement())
+  name               String               @db.NVarChar(255) @map("ten")
+  slug               String?              @unique @db.NVarChar(255)
+  description        String?              @db.NVarChar(Max) @map("mo_ta")
+  brand_id           Int?                 @map("thuong_hieu_id")
+  category_id        Int?                 @map("danh_muc_id")
+  status             String?              @default("active") @db.NVarChar(20) @map("trang_thai")
+  created_at         DateTime?            @default(now()) @db.DateTime @map("ngay_tao")
   product_attributes product_attributes[]
   product_images     product_images[]
   product_reviews    product_reviews[]
   product_variants   product_variants[]
-  brands             brands?              @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK__products__brand___6754599E")
-  categories         categories?          @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK__products__catego__68487DD7")
+  brands             brands?              @relation(fields: [brand_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  categories         categories?          @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   cart_items         cart_items[]
   order_items        order_items[]
 
   @@index([name], map: "idx_product_name")
+  @@map("san_pham")
 }
 
 model users {
   id         Int          @id @default(autoincrement())
   email      String       @unique @db.NVarChar(255)
-  password   String       @db.NVarChar(255)
-  role       String       @default("USER") @db.NVarChar(50)
-  name       String?      @db.NVarChar(255)
-  phone      String?      @db.NVarChar(20)
-  address    String?      @db.NVarChar(500)
-  created_at DateTime?    @default(now()) @db.DateTime
+  password   String       @db.NVarChar(255) @map("mat_khau")
+  role       String       @default("USER") @db.NVarChar(50) @map("vai_tro")
+  name       String?      @db.NVarChar(255) @map("ten")
+  phone      String?      @db.NVarChar(20) @map("so_dien_thoai")
+  address    String?      @db.NVarChar(500) @map("dia_chi")
+  created_at DateTime?    @default(now()) @db.DateTime @map("ngay_tao")
   cart_items cart_items[]
   orders     orders[]
+
+  @@map("nguoi_dung")
 }
 
 model cart_items {
   id         Int       @id @default(autoincrement())
-  user_id    Int
-  product_id Int
-  quantity   Int       @default(1)
-  created_at DateTime? @default(now()) @db.DateTime
+  user_id    Int       @map("nguoi_dung_id")
+  product_id Int       @map("san_pham_id")
+  quantity   Int       @default(1) @map("so_luong")
+  created_at DateTime? @default(now()) @db.DateTime @map("ngay_tao")
   products   products  @relation(fields: [product_id], references: [id], onDelete: Cascade)
   users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@unique([user_id, product_id])
+  @@map("chi_tiet_gio_hang")
 }
 
 model orders {
   id           Int           @id @default(autoincrement())
-  user_id      Int
-  total_amount Float
-  status       String        @default("PENDING") @db.NVarChar(50)
-  created_at   DateTime?     @default(now()) @db.DateTime
+  user_id      Int           @map("nguoi_dung_id")
+  total_amount Float         @map("tong_tien")
+  status       String        @default("PENDING") @db.NVarChar(50) @map("trang_thai")
+  created_at   DateTime?     @default(now()) @db.DateTime @map("ngay_tao")
   order_items  order_items[]
   users        users         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@map("don_hang")
 }
 
 model order_items {
   id         Int      @id @default(autoincrement())
-  order_id   Int
-  product_id Int
-  quantity   Int
-  price      Float
+  order_id   Int      @map("don_hang_id")
+  product_id Int      @map("san_pham_id")
+  quantity   Int      @map("so_luong")
+  price      Float    @map("gia")
   orders     orders   @relation(fields: [order_id], references: [id], onDelete: Cascade)
   products   products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+
+  @@map("chi_tiet_don_hang")
 }
