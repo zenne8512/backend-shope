@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
@@ -8,14 +9,31 @@ async function main() {
     await prisma.order_items.deleteMany({});
     await prisma.cart_items.deleteMany({});
     await prisma.product_reviews.deleteMany({});
-    await prisma.product_images.deleteMany({});
-    await prisma.product_variants.deleteMany({});
-    await prisma.product_attributes.deleteMany({});
     await prisma.products.deleteMany({});
     await prisma.brands.deleteMany({});
     await prisma.categories.deleteMany({});
 
     console.log('✅ Đã xóa sạch dữ liệu sản phẩm cũ.');
+
+    // 1.5. Tạo tài khoản Admin mặc định để tránh lỗi đăng nhập quản trị ở máy mới
+    const adminEmail = 'admin@shoppi.com';
+    const adminPassword = 'Admin@123';
+    
+    // Xóa admin cũ nếu đã tồn tại
+    await prisma.users.deleteMany({ where: { email: adminEmail } });
+    
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(adminPassword, salt);
+    
+    await prisma.users.create({
+        data: {
+            email: adminEmail,
+            password: hashedPassword,
+            role: 'ADMIN',
+            name: 'System Admin'
+        }
+    });
+    console.log('✅ Đã khởi tạo tài khoản Admin mặc định: admin@shoppi.com / Admin@123');
 
     // 2. Tạo danh mục (Categories)
     const categoriesData = [
@@ -416,34 +434,11 @@ async function main() {
                 description: p.description,
                 category_id: catId,
                 brand_id: brandId,
-                status: 'active'
-            }
-        });
-
-        await prisma.product_variants.create({
-            data: {
-                product_id: createdProd.id,
-                name: 'Mặc định',
                 price: p.price,
                 stock: p.stock,
-                sku: `SKU-${createdProd.id}-DEFAULT`
-            }
-        });
-
-        await prisma.product_images.create({
-            data: {
-                product_id: createdProd.id,
                 image_url: p.image,
-                is_main: true
-            }
-        });
-
-        // Ảnh phụ thứ 2
-        await prisma.product_images.create({
-            data: {
-                product_id: createdProd.id,
-                image_url: p.image + '&secondary=1',
-                is_main: false
+                image_url_2: p.image + '&secondary=1',
+                status: 'active'
             }
         });
 

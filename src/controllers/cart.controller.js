@@ -10,8 +10,6 @@ const getCart = async (req, res) => {
       include: {
         products: {
           include: {
-            product_variants: true,
-            product_images: true,
             brands: true,
           }
         }

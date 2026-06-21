@@ -12,9 +12,7 @@ const createOrder = async (req, res) => {
       const cartItems = await tx.cart_items.findMany({
         where: { user_id: req.user.id },
         include: { 
-          products: {
-            include: { product_variants: true }
-          } 
+          products: true 
         },
       });
 
@@ -27,24 +25,18 @@ const createOrder = async (req, res) => {
 
       // 2. Check stock for all items
       for (const item of cartItems) {
-        const firstVariant = item.products.product_variants && item.products.product_variants.length > 0
-          ? item.products.product_variants[0]
-          : null;
-
-        if (!firstVariant) {
-          throw new Error(`Sản phẩm ${item.products.name} không có biến thể hợp lệ.`);
-        }
+        const product = item.products;
 
         // Use findUnique to get the most up-to-date stock inside transaction
-        const variantCheck = await tx.product_variants.findUnique({
-          where: { id: firstVariant.id }
+        const productCheck = await tx.products.findUnique({
+          where: { id: product.id }
         });
 
-        if ((variantCheck.stock || 0) < item.quantity) {
-          throw new Error(`Sản phẩm ${item.products.name} chỉ còn ${variantCheck.stock} sản phẩm trong kho, không đủ số lượng bạn yêu cầu.`);
+        if ((productCheck.stock || 0) < item.quantity) {
+          throw new Error(`Sản phẩm ${product.name} chỉ còn ${productCheck.stock} sản phẩm trong kho, không đủ số lượng bạn yêu cầu.`);
         }
 
-        const price = parseFloat(variantCheck.price);
+        const price = parseFloat(productCheck.price);
         const quantity = item.quantity;
         totalAmount += price * quantity;
 
@@ -55,8 +47,8 @@ const createOrder = async (req, res) => {
         });
 
         // 3. Deduct stock safely
-        await tx.product_variants.update({
-          where: { id: firstVariant.id },
+        await tx.products.update({
+          where: { id: product.id },
           data: {
             stock: {
               decrement: item.quantity
@@ -131,9 +123,7 @@ const getOrderById = async (req, res) => {
       include: {
         order_items: {
           include: {
-            products: {
-              include: { product_images: true }
-            }
+            products: true
           }
         },
         users: {
@@ -169,9 +159,7 @@ const cancelOrder = async (req, res) => {
       include: {
         order_items: {
           include: {
-            products: {
-              include: { product_variants: true }
-            }
+            products: true
           }
         }
       }
@@ -193,15 +181,11 @@ const cancelOrder = async (req, res) => {
         data: { status: 'CANCELLED' }
       });
 
-      // 2. Return stock to variants
+      // 2. Return stock to products
       for (const item of order.order_items) {
-        const firstVariant = item.products.product_variants && item.products.product_variants.length > 0
-          ? item.products.product_variants[0]
-          : null;
-
-        if (firstVariant) {
-          await prisma.product_variants.update({
-            where: { id: firstVariant.id },
+        if (item.products) {
+          await prisma.products.update({
+            where: { id: item.product_id },
             data: {
               stock: {
                 increment: item.quantity
@@ -261,9 +245,7 @@ const updateOrderStatus = async (req, res) => {
       include: {
         order_items: {
           include: {
-            products: {
-              include: { product_variants: true }
-            }
+            products: true
           }
         }
       }
@@ -287,13 +269,9 @@ const updateOrderStatus = async (req, res) => {
 
         // Return stock
         for (const item of order.order_items) {
-          const firstVariant = item.products.product_variants && item.products.product_variants.length > 0
-            ? item.products.product_variants[0]
-            : null;
-
-          if (firstVariant) {
-            await tx.product_variants.update({
-              where: { id: firstVariant.id },
+          if (item.products) {
+            await tx.products.update({
+              where: { id: item.product_id },
               data: {
                 stock: { increment: item.quantity }
               }
@@ -370,31 +348,18 @@ const createGuestOrder = async (req, res) => {
       // 2. Check stock and prepare order items
       for (const item of items) {
         const product = await tx.products.findUnique({
-          where: { id: parseInt(item.product_id) },
-          include: { product_variants: true }
+          where: { id: parseInt(item.product_id) }
         });
 
         if (!product) {
           throw new Error(`Sản phẩm với ID ${item.product_id} không tồn tại.`);
         }
 
-        const firstVariant = product.product_variants && product.product_variants.length > 0
-          ? product.product_variants[0]
-          : null;
-
-        if (!firstVariant) {
-          throw new Error(`Sản phẩm ${product.name} không có biến thể hợp lệ.`);
+        if ((product.stock || 0) < item.quantity) {
+          throw new Error(`Sản phẩm ${product.name} chỉ còn ${product.stock} sản phẩm trong kho, không đủ số lượng bạn yêu cầu.`);
         }
 
-        const variantCheck = await tx.product_variants.findUnique({
-          where: { id: firstVariant.id }
-        });
-
-        if ((variantCheck.stock || 0) < item.quantity) {
-          throw new Error(`Sản phẩm ${product.name} chỉ còn ${variantCheck.stock} sản phẩm trong kho, không đủ số lượng bạn yêu cầu.`);
-        }
-
-        const price = parseFloat(variantCheck.price);
+        const price = parseFloat(product.price);
         const quantity = item.quantity;
         totalAmount += price * quantity;
 
@@ -405,8 +370,8 @@ const createGuestOrder = async (req, res) => {
         });
 
         // Deduct stock
-        await tx.product_variants.update({
-          where: { id: firstVariant.id },
+        await tx.products.update({
+          where: { id: product.id },
           data: {
             stock: {
               decrement: item.quantity

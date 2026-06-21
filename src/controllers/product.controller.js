@@ -27,13 +27,9 @@ const getProducts = async (req, res) => {
     }
 
     if (minPrice || maxPrice) {
-      where.product_variants = {
-        some: {
-          price: {
-            gte: minPrice ? parseFloat(minPrice) : undefined,
-            lte: maxPrice ? parseFloat(maxPrice) : undefined
-          }
-        }
+      where.price = {
+        gte: minPrice ? parseFloat(minPrice) : undefined,
+        lte: maxPrice ? parseFloat(maxPrice) : undefined
       };
     }
 
@@ -43,8 +39,6 @@ const getProducts = async (req, res) => {
       include: {
         categories: true,
         brands: true,
-        product_images: true,
-        product_variants: true,
         product_reviews: true
       }
     });
@@ -66,14 +60,14 @@ const getProducts = async (req, res) => {
     // In-memory Sorting
     if (sort === 'price_asc') {
       products.sort((a, b) => {
-        const priceA = a.product_variants && a.product_variants.length > 0 ? parseFloat(a.product_variants[0].price) : 0;
-        const priceB = b.product_variants && b.product_variants.length > 0 ? parseFloat(b.product_variants[0].price) : 0;
+        const priceA = a.price ? parseFloat(a.price) : 0;
+        const priceB = b.price ? parseFloat(b.price) : 0;
         return priceA - priceB;
       });
     } else if (sort === 'price_desc') {
       products.sort((a, b) => {
-        const priceA = a.product_variants && a.product_variants.length > 0 ? parseFloat(a.product_variants[0].price) : 0;
-        const priceB = b.product_variants && b.product_variants.length > 0 ? parseFloat(b.product_variants[0].price) : 0;
+        const priceA = a.price ? parseFloat(a.price) : 0;
+        const priceB = b.price ? parseFloat(b.price) : 0;
         return priceB - priceA;
       });
     } else if (sort === 'newest') {
@@ -112,16 +106,7 @@ const getProductById = async (req, res) => {
       include: { 
         categories: true,
         brands: true,
-        product_images: true,
-        product_variants: true,
-        product_reviews: true,
-        product_attributes: {
-          include: {
-            attribute_values: {
-              include: { attributes: true }
-            }
-          }
-        }
+        product_reviews: true
       },
     });
 
@@ -151,7 +136,7 @@ const getProductById = async (req, res) => {
 // @access  Private/Admin
 const createProduct = async (req, res) => {
   try {
-    const { name, price, description, image, category_id, brand_id } = req.body;
+    const { name, price, description, image, category_id, brand_id, stock } = req.body;
 
     if (!name || !price || !category_id) {
       return res.status(400).json({ message: 'Name, price and category_id are required' });
@@ -160,6 +145,7 @@ const createProduct = async (req, res) => {
     const priceFloat = parseFloat(price);
     const categoryIdInt = parseInt(category_id);
     const brandIdInt = brand_id ? parseInt(brand_id) : null;
+    const stockInt = stock !== undefined ? parseInt(stock) : 100;
 
     // Create the product
     const product = await prisma.products.create({
@@ -168,26 +154,13 @@ const createProduct = async (req, res) => {
         description,
         category_id: categoryIdInt,
         brand_id: brandIdInt,
-        // create associated variant for price
-        product_variants: {
-          create: {
-            price: priceFloat,
-            name: "Default Variant",
-            stock: 100
-          }
-        },
-        // create associated image if provided
-        product_images: image ? {
-          create: {
-            image_url: image,
-            is_main: true
-          }
-        } : undefined
+        price: priceFloat,
+        stock: stockInt,
+        image_url: image || null
       },
       include: {
         categories: true,
-        product_variants: true,
-        product_images: true
+        brands: true
       }
     });
 
@@ -208,8 +181,7 @@ const updateProduct = async (req, res) => {
     
     // Check if product exists
     const productExists = await prisma.products.findUnique({
-      where: { id: productId },
-      include: { product_variants: true, product_images: true }
+      where: { id: productId }
     });
     
     if (!productExists) {
@@ -221,44 +193,18 @@ const updateProduct = async (req, res) => {
     if (description !== undefined) dataToUpdate.description = description;
     if (category_id) dataToUpdate.category_id = parseInt(category_id);
     if (brand_id !== undefined) dataToUpdate.brand_id = brand_id ? parseInt(brand_id) : null;
+    if (price) dataToUpdate.price = parseFloat(price);
+    if (stock !== undefined) dataToUpdate.stock = parseInt(stock);
+    if (image !== undefined) dataToUpdate.image_url = image;
 
-    // Update product basics
-    const product = await prisma.products.update({
+    // Update product
+    const updatedProduct = await prisma.products.update({
       where: { id: productId },
       data: dataToUpdate,
-    });
-
-    // Update price and stock on the first variant if provided
-    if (productExists.product_variants.length > 0) {
-      const variantData = {};
-      if (price) variantData.price = parseFloat(price);
-      if (stock !== undefined) variantData.stock = parseInt(stock);
-      
-      if (Object.keys(variantData).length > 0) {
-        await prisma.product_variants.update({
-          where: { id: productExists.product_variants[0].id },
-          data: variantData
-        });
+      include: {
+        categories: true,
+        brands: true
       }
-    }
-
-    // Update or create image
-    if (image !== undefined) {
-      if (productExists.product_images.length > 0) {
-        await prisma.product_images.update({
-          where: { id: productExists.product_images[0].id },
-          data: { image_url: image }
-        });
-      } else if (image) {
-        await prisma.product_images.create({
-          data: { product_id: productId, image_url: image, is_main: true }
-        });
-      }
-    }
-
-    const updatedProduct = await prisma.products.findUnique({
-      where: { id: productId },
-      include: { categories: true, product_variants: true, product_images: true }
     });
 
     res.json(updatedProduct);
