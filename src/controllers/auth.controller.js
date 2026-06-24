@@ -7,10 +7,10 @@ const { generateToken } = require('../utils/jwt');
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, name, role } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Please provide email and password' });
+      return res.status(400).json({ message: 'Vui lòng nhập email và mật khẩu' });
     }
 
     const userExists = await prisma.users.findUnique({
@@ -18,7 +18,7 @@ const registerUser = async (req, res) => {
     });
 
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists' });
+      return res.status(400).json({ message: 'Email này đã được đăng ký. Vui lòng dùng email khác.' });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -28,6 +28,7 @@ const registerUser = async (req, res) => {
       data: {
         email,
         password: hashedPassword,
+        name: name || null,
         // Only allow ADMIN role if specifically provided
         role: role === 'ADMIN' ? 'ADMIN' : 'USER',
       },
@@ -35,18 +36,20 @@ const registerUser = async (req, res) => {
         id: true,
         email: true,
         role: true,
+        name: true,
       }
     });
 
     res.status(201).json({
       id: user.id,
       email: user.email,
+      name: user.name,
       role: user.role,
       token: generateToken(user.id, user.role),
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Lỗi server. Vui lòng thử lại sau.' });
   }
 };
 
@@ -58,7 +61,7 @@ const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ message: 'Please provide email and password' });
+      return res.status(400).json({ message: 'Vui lòng nhập email và mật khẩu' });
     }
 
     const user = await prisma.users.findUnique({
@@ -69,15 +72,16 @@ const loginUser = async (req, res) => {
       res.json({
         id: user.id,
         email: user.email,
+        name: user.name,
         role: user.role,
         token: generateToken(user.id, user.role),
       });
     } else {
-      res.status(401).json({ message: 'Invalid credentials' });
+      res.status(401).json({ message: 'Email hoặc mật khẩu không đúng' });
     }
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Lỗi server. Vui lòng thử lại sau.' });
   }
 };
 
